@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 interface LinkedInResponse {
   success: boolean;
   message: string;
-  data: {
+  data?: {
     total: number;
     items: {
       fullName: string;
@@ -39,9 +39,23 @@ export async function POST(req: Request) {
     const response = await fetch(url, options);
     const data = (await response.json()) as LinkedInResponse;
 
-    console.log(data.data);
+    // Check if data and data.data exist before accessing items
+    if (data?.success && data?.data?.items && data.data.items.length > 0) {
+      // If we found multiple people, return them all
+      if (data.data.items.length > 1) {
+        return NextResponse.json({
+          multiple: true,
+          items: data.data.items.map((item) => ({
+            fullName: item.fullName,
+            headline: item.headline,
+            location: item.location,
+            profileURL: item.profileURL,
+            profilePicture: item.profilePicture,
+          })),
+        });
+      }
 
-    if (data.success && data.data.items.length > 0) {
+      // If we only found one person, return in the original format
       return NextResponse.json({
         ceo: data.data.items[0].fullName,
         headline: data.data.items[0].headline,

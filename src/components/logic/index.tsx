@@ -1,7 +1,14 @@
 "use client";
-
 import React, { useState } from "react";
-import { RefreshCcw, HardDriveDownload } from "lucide-react";
+import { RefreshCcw, HardDriveDownload, X } from "lucide-react";
+
+interface LinkedInPerson {
+  fullName: string;
+  headline: string;
+  location: string;
+  profileURL: string;
+  profilePicture: string;
+}
 
 interface LinkedInData {
   ceo: string;
@@ -16,6 +23,66 @@ interface ProcessedItem {
   linkedInData?: LinkedInData;
 }
 
+interface SelectPersonModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  people: LinkedInPerson[];
+  onSelect: (person: LinkedInPerson) => void;
+  companyName: string;
+}
+
+const SelectPersonModal: React.FC<SelectPersonModalProps> = ({
+  isOpen,
+  onClose,
+  people,
+  onSelect,
+  companyName,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">
+            Select Person from {companyName}
+          </h2>
+          <button onClick={onClose} className="p-2">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          {people.map((person, index) => (
+            <div
+              key={index}
+              className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+              onClick={() => {
+                onSelect(person);
+                onClose();
+              }}
+            >
+              <div className="flex items-center gap-4">
+                {person.profilePicture && (
+                  <img
+                    src={person.profilePicture}
+                    alt={person.fullName}
+                    className="w-12 h-12 rounded-full"
+                  />
+                )}
+                <div>
+                  <h3 className="font-semibold">{person.fullName}</h3>
+                  <p className="text-sm text-gray-600">{person.headline}</p>
+                  <p className="text-sm text-gray-500">{person.location}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const LogicComponent: React.FC = () => {
   const [rawData, setRawData] = useState<string>("");
   const [errors, setErrors] = useState<string[]>([]);
@@ -23,6 +90,12 @@ const LogicComponent: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [currentCompany, setCurrentCompany] = useState<string>("");
   const [progress, setProgress] = useState<number>(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentPeople, setCurrentPeople] = useState<LinkedInPerson[]>([]);
+  const [processingQueue, setProcessingQueue] = useState<{
+    index: number;
+    remaining: ProcessedItem[];
+  } | null>(null);
 
   const processData = (): void => {
     const lines = rawData.split("\n").filter((line) => line.trim());
@@ -67,7 +140,12 @@ const LogicComponent: React.FC = () => {
       .trim();
   };
 
-  const fetchCEOData = async (company: string): Promise<LinkedInData> => {
+  const fetchCEOData = async (
+    company: string
+  ): Promise<{
+    data: LinkedInPerson[];
+    single?: LinkedInData;
+  }> => {
     try {
       const response = await fetch("/api/search", {
         method: "POST",
@@ -78,43 +156,108 @@ const LogicComponent: React.FC = () => {
       });
 
       const data = await response.json();
-      return data.ceo === "Not found" ? { ceo: "Not found" } : data;
+
+      if (data.multiple && Array.isArray(data.items)) {
+        return { data: data.items };
+      } else if (data.ceo && data.ceo !== "Not found") {
+        return {
+          data: [],
+          single: {
+            ceo: data.ceo,
+            headline: data.headline,
+            location: data.location,
+            profileUrl: data.profileUrl,
+          },
+        };
+      }
+
+      return { data: [] };
     } catch (error) {
       console.error("Error fetching CEO data:", error);
-      return { ceo: "Not found" };
+      return { data: [] };
+    }
+  };
+
+  const handlePersonSelection = async (person: LinkedInPerson) => {
+    if (!processingQueue) return;
+
+    const { index, remaining } = processingQueue;
+    const linkedInData = {
+      ceo: person.fullName,
+      headline: person.headline,
+      location: person.location,
+      profileUrl: person.profileURL,
+    };
+
+    const updatedProcessedData = [...processedData];
+    updatedProcessedData[index] = {
+      ...updatedProcessedData[index],
+      linkedInData,
+    };
+    setProcessedData(updatedProcessedData);
+
+    // Continue processing remaining items
+    await processRemainingItems(remaining);
+  };
+
+  const processRemainingItems = async (remainingItems: ProcessedItem[]) => {
+    if (!remainingItems.length) {
+      setIsLoading(false);
+      setCurrentCompany("");
+      setProgress(0);
+      return;
+    }
+
+    const totalItems = processedData.length;
+    const processedCount = totalItems - remainingItems.length;
+
+    for (let i = 0; i < remainingItems.length; i++) {
+      const item = remainingItems[i];
+      const currentIndex = processedCount + i;
+      const companyName = extractCompanyName(item.email);
+      setCurrentCompany(companyName);
+
+      try {
+        const result = await fetchCEOData(companyName);
+
+        // Safe check for data array
+        if (Array.isArray(result.data) && result.data.length > 1) {
+          // Multiple people found, show modal
+          setCurrentPeople(result.data);
+          setModalOpen(true);
+          setProcessingQueue({
+            index: currentIndex,
+            remaining: remainingItems.slice(i + 1),
+          });
+          break;
+        } else if (result.single) {
+          // Single person found, use automatically
+          const updatedProcessedData = [...processedData];
+          updatedProcessedData[currentIndex] = {
+            ...item,
+            linkedInData: result.single,
+          };
+          setProcessedData(updatedProcessedData);
+        }
+
+        setProgress(Math.round(((currentIndex + 1) / totalItems) * 100));
+      } catch (error) {
+        console.error(`Error processing company ${companyName}:`, error);
+        continue; // Skip this item and continue with the next
+      }
+    }
+
+    if (!remainingItems.length) {
+      setIsLoading(false);
+      setCurrentCompany("");
+      setProgress(0);
     }
   };
 
   const handleDownload = async () => {
     setIsLoading(true);
     setProgress(0);
-    const enrichedData: ProcessedItem[] = [];
-    const totalItems = processedData.length;
-
-    try {
-      for (let i = 0; i < processedData.length; i++) {
-        const item = processedData[i];
-        const companyName = extractCompanyName(item.email);
-        setCurrentCompany(companyName);
-        const linkedInData = await fetchCEOData(companyName);
-
-        enrichedData.push({
-          ...item,
-          linkedInData,
-        });
-
-        // Update progress
-        setProgress(Math.round(((i + 1) / totalItems) * 100));
-      }
-
-      setProcessedData(enrichedData);
-    } catch (error) {
-      console.error("Error processing CEO data:", error);
-    } finally {
-      setIsLoading(false);
-      setCurrentCompany("");
-      setProgress(0);
-    }
+    await processRemainingItems([...processedData]);
   };
 
   const renderProcessedData = () => {
@@ -235,6 +378,14 @@ const LogicComponent: React.FC = () => {
           </button>
         </div>
       )}
+
+      <SelectPersonModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        people={currentPeople}
+        onSelect={handlePersonSelection}
+        companyName={currentCompany}
+      />
     </div>
   );
 };
