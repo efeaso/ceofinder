@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const options = {
     method: "GET",
     headers: {
-      "x-rapidapi-key": "953c5247bfmsh834e1258f271226p132277jsn7d296c0cfc3e",
+      "x-rapidapi-key": "909b22e2bdmsh5f40f4996bd66f9p143fd1jsn3d426375925f",
       "x-rapidapi-host": "linkedin-api8.p.rapidapi.com",
     },
   };
@@ -38,6 +38,8 @@ export async function POST(req: Request) {
   try {
     const response = await fetch(url, options);
     const data = (await response.json()) as LinkedInResponse;
+
+    console.log(data);
 
     // Check if data and data.data exist before accessing items
     if (data?.success && data?.data?.items && data.data.items.length > 0) {

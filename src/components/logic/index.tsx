@@ -261,8 +261,6 @@ const LogicComponent: React.FC = () => {
   };
 
   const renderProcessedData = () => {
-    if (!processedData[0].linkedInData) return null;
-
     return (
       <div className="space-y-4">
         {processedData.map((item, index) => (
@@ -270,35 +268,40 @@ const LogicComponent: React.FC = () => {
             <div className="card-body">
               <h2 className="card-title">{item.name}</h2>
               <p className="text-sm opacity-70">{item.email}</p>
-              <div className="divider"></div>
-              <div className="space-y-2">
-                <p>
-                  <span className="font-semibold">Company Leader:</span>{" "}
-                  {item.linkedInData?.ceo}
-                </p>
-                {item.linkedInData?.headline && (
-                  <p>
-                    <span className="font-semibold">Title:</span>{" "}
-                    {item.linkedInData.headline}
-                  </p>
-                )}
-                {item.linkedInData?.location && (
-                  <p>
-                    <span className="font-semibold">Location:</span>{" "}
-                    {item.linkedInData.location}
-                  </p>
-                )}
-                {item.linkedInData?.profileUrl && (
-                  <a
-                    href={item.linkedInData.profileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link link-primary"
-                  >
-                    View LinkedIn Profile
-                  </a>
-                )}
-              </div>
+
+              {item.linkedInData && (
+                <>
+                  <div className="divider"></div>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-semibold">Company Leader:</span>{" "}
+                      {item.linkedInData.ceo}
+                    </p>
+                    {item.linkedInData.headline && (
+                      <p>
+                        <span className="font-semibold">Title:</span>{" "}
+                        {item.linkedInData.headline}
+                      </p>
+                    )}
+                    {item.linkedInData.location && (
+                      <p>
+                        <span className="font-semibold">Location:</span>{" "}
+                        {item.linkedInData.location}
+                      </p>
+                    )}
+                    {item.linkedInData.profileUrl && (
+                      <a
+                        href={item.linkedInData.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="link link-primary"
+                      >
+                        View LinkedIn Profile
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ))}
@@ -355,12 +358,57 @@ const LogicComponent: React.FC = () => {
           <h3 className="text-md font-semibold mb-2">Processed Data:</h3>
           <div className="bg-base-200 p-4 rounded-md">
             {processedData.length} valid contacts found
-            {processedData[0].linkedInData && renderProcessedData()}
+            <div className="space-y-4 mt-4">
+              {processedData.map((item, index) => (
+                <div key={index} className="card bg-base-100 shadow-xl">
+                  <div className="card-body">
+                    <h2 className="card-title">{item.name}</h2>
+                    <p className="text-sm opacity-70">{item.email}</p>
+
+                    {item.linkedInData && (
+                      <>
+                        <div className="divider"></div>
+                        <div className="space-y-2">
+                          <p>
+                            <span className="font-semibold">
+                              Company Leader:
+                            </span>{" "}
+                            {item.linkedInData.ceo}
+                          </p>
+                          {item.linkedInData.headline && (
+                            <p>
+                              <span className="font-semibold">Title:</span>{" "}
+                              {item.linkedInData.headline}
+                            </p>
+                          )}
+                          {item.linkedInData.location && (
+                            <p>
+                              <span className="font-semibold">Location:</span>{" "}
+                              {item.linkedInData.location}
+                            </p>
+                          )}
+                          {item.linkedInData.profileUrl && (
+                            <a
+                              href={item.linkedInData.profileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="link link-primary"
+                            >
+                              View LinkedIn Profile
+                            </a>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <button
             onClick={handleDownload}
-            className={`btn btn-secondary w-full mt-5`}
+            className="btn btn-secondary w-full mt-5"
             disabled={isLoading}
           >
             {!isLoading && (
